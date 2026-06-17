@@ -1,0 +1,6 @@
+pandas==2.2.1
+numpy==1.26.4
+requests==2.31.0
+urllib3==2.2.1
+flask==3.0.3
+anthropic>=0.69.0

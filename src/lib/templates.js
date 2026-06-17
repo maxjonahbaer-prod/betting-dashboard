@@ -1,0 +1,357 @@
+// ============================================================================
+// PROMO_TEMPLATES — pre-built promo catalog for the Token Library.
+//
+// Each template is a partial token derived from a real sportsbook promo. The
+// Template Picker shows these; selecting one pre-fills the Token Form. The user
+// then adds their own token_id, received/expiry dates, and strategy notes.
+//
+// `token_id_example` is display-only (a sample code from the source promo) and
+// is NOT copied into a created token — see templateToToken.
+// ============================================================================
+
+import { emptyToken, normalizeToken, todayISODate } from './tokenStore'
+
+export const PROMO_TEMPLATES = [
+  {
+    template_id: 'fd-wc-50pct-profit-boost',
+    sportsbook: 'FanDuel',
+    promo_name: 'Daily World Cup 50% Profit Boost',
+    promo_type: 'profit_boost',
+    boost_percentage: 50,
+    boost_applies_to: 'net_winnings',
+    max_wager_amount: 10,
+    min_odds: '-200',
+    eligible_sports: ['Soccer'],
+    eligible_leagues: ['World Cup'],
+    eligible_markets: [],
+    eligible_bet_types: ['straight', 'parlay', 'sgp'],
+    excluded_bet_types: ['odds_boosts', 'bonus_bets', 'cashed_out'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    combinable_with_other_promos: false,
+    early_win_trigger: null,
+    ai_extraction_formula:
+      'boosted_net = net_win * 1.50; total_payout = stake + boosted_net. Pair with a matching opposing boost on DraftKings on a two-way market (O/U half-goal line). Guaranteed profit = boosted_payout_side_A - stake_side_B across optimal split.',
+    notes:
+      'Renews daily during World Cup. Expires 24 hours after receipt. Payout includes boosted winnings + initial stake returned. Cannot use bonus funds. Key: avoid Draw No Bet — a draw voids both legs and both tokens.',
+  },
+  {
+    template_id: 'dk-cup-50pct-sgpx-boost',
+    sportsbook: 'DraftKings',
+    promo_name: 'The Cup 50% SGP(X) Boost',
+    promo_type: 'sgp_boost',
+    boost_percentage: 50,
+    boost_applies_to: 'net_winnings',
+    max_wager_amount: 10,
+    min_odds: '+300',
+    eligible_sports: ['Soccer'],
+    eligible_leagues: ['World Cup'],
+    eligible_markets: ['SGP', 'SGPx'],
+    eligible_bet_types: ['sgp', 'sgpx'],
+    min_legs: 3,
+    excluded_bet_types: ['straight', 'parlay', 'odds_boosts', 'bonus_bets', 'cashed_out'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: '783R7E',
+    ai_extraction_formula:
+      'boosted_net = net_win * 1.50. SGP only — not hedgeable against a simple opposing straight bet. Value extraction requires building a correlated SGP where one outcome is likely and odds still clear +300 minimum.',
+    notes:
+      'Status: Reward Claimed (already issued). Applies to SGP or SGPx only, 3+ legs, total odds +300 or longer. Not directly hedgeable like a straight profit boost — treat as speculative value play unless a correlated hedge is available. Expires end of World Cup on 6/17.',
+  },
+  {
+    template_id: 'dk-cup-drawbreaker',
+    sportsbook: 'DraftKings',
+    promo_name: 'The Cup DrawBreaker',
+    promo_type: 'draw_refund',
+    free_bet_amount: 10,
+    stake_returned_on_free_bet: false,
+    max_wager_amount: 10,
+    eligible_sports: ['Soccer'],
+    eligible_leagues: ['World Cup'],
+    eligible_markets: ['3-way moneyline'],
+    eligible_bet_types: ['straight'],
+    excluded_bet_types: [],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: 'EPRZ44',
+    protection_type: 'bonus_bet',
+    protection_max_refund: 10,
+    ai_extraction_formula:
+      'Place a 3-way moneyline bet on a team to win. If match ends in a draw, receive up to $10 bonus bet refund (stake not returned — profit only on reuse). This reduces downside on a draw outcome. NOT a full hedge — reduces draw risk only. Combine with knowledge that a draw is possible but not likely to size appropriately.',
+    notes:
+      'Qualifying bet must be a pre-game 3-way moneyline (team to WIN, not draw). Refund only triggers on 90-min draw + stoppage time. Bonus bet expires 7 days after issue, stake removed from payout. Expires 10:00 PM ET 6/17. Token ID: EPRZ44.',
+  },
+  {
+    template_id: 'dk-mlb-30pct-sgpx-boost',
+    sportsbook: 'DraftKings',
+    promo_name: 'MLB 30% SGP(X) Boost',
+    promo_type: 'sgp_boost',
+    boost_percentage: 30,
+    boost_applies_to: 'net_winnings',
+    max_wager_amount: 10,
+    min_odds: '+300',
+    eligible_sports: ['Baseball'],
+    eligible_leagues: ['MLB'],
+    eligible_markets: ['SGP', 'SGPx'],
+    eligible_bet_types: ['sgp', 'sgpx'],
+    min_legs: 3,
+    excluded_bet_types: ['straight', 'parlay', 'odds_boosts', 'bonus_bets', 'cashed_out'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: '783JKE',
+    ai_extraction_formula:
+      'boosted_net = net_win * 1.30. SGP only, 3+ legs, total odds +300 or longer. Not directly hedgeable. Treat as value enhancement on a correlated SGP.',
+    notes:
+      'Status: Reward Claimed. Expires end of final MLB game 6/17/2026. Must select token in betslip BEFORE placing bet. Cash balance or DK Dollars only.',
+  },
+  {
+    template_id: 'dk-mlb-25pct-sgpx-boost',
+    sportsbook: 'DraftKings',
+    promo_name: 'MLB 25% SGP(X) Boost',
+    promo_type: 'sgp_boost',
+    boost_percentage: 25,
+    boost_applies_to: 'net_winnings',
+    max_wager_amount: 10,
+    min_odds: '+400',
+    eligible_sports: ['Baseball'],
+    eligible_leagues: ['MLB'],
+    eligible_markets: ['SGP', 'SGPx'],
+    eligible_bet_types: ['sgp', 'sgpx'],
+    min_legs: 3,
+    excluded_bet_types: ['straight', 'parlay', 'odds_boosts', 'bonus_bets', 'cashed_out'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: 'V9RYV8',
+    ai_extraction_formula:
+      'boosted_net = net_win * 1.25. SGP/SGPx only, 3+ legs, total odds +400 or longer. Higher odds threshold than the 30% version — harder to construct a qualifying bet.',
+    notes:
+      'Expires end of final MLB game 6/17/2026. Must select token BEFORE placing. Cash/DK Dollars only. Distinct from the 30% version — different token ID and different min odds threshold (+400 vs +300).',
+  },
+  {
+    template_id: 'dk-usopen-frl-400-odds-surge',
+    sportsbook: 'DraftKings',
+    promo_name: 'US Open First Round Leader +400 Odds Surge',
+    promo_type: 'odds_boost',
+    boost_percentage: null,
+    max_wager_amount: 10,
+    eligible_sports: ['Golf'],
+    eligible_leagues: ['US Open Championship'],
+    eligible_markets: ['First Round Leader'],
+    eligible_bet_types: ['straight'],
+    excluded_bet_types: ['parlay', 'sgp', 'sgpx', 'live', 'odds_boosts'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: 'JGYVP2',
+    ai_extraction_formula:
+      'Fixed +400 boost applied to First Round Leader market only. E.g. +1100 becomes +1500, +2250 becomes +2650. Payout = stake * (boosted_american_odds/100 + 1) if positive odds. Not hedgeable in standard two-way fashion — single-outcome market with many competitors. Value play only.',
+    notes:
+      'Status: Reward Claimed. Expires at start of US Open Thursday 6/18. Single-use per customer. Excludes parlays, SGP, SGPx, live bets, and other odds boosts. Cash/DK Dollars only.',
+  },
+  {
+    template_id: 'dk-usopen-makecut-25pct-parlay-boost',
+    sportsbook: 'DraftKings',
+    promo_name: 'US Open Make the Cut 25% Parlay Boost',
+    promo_type: 'parlay_boost',
+    boost_percentage: 25,
+    boost_applies_to: 'net_winnings',
+    max_wager_amount: 10,
+    min_odds: '+200',
+    eligible_sports: ['Golf'],
+    eligible_leagues: ['US Open Championship'],
+    eligible_markets: ['Make the Cut'],
+    eligible_bet_types: ['parlay'],
+    min_legs: 2,
+    excluded_bet_types: ['sgpx', 'progressive_parlay', 'odds_boosts', 'cashed_out', 'voided'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: '1P6JJ3',
+    ai_extraction_formula:
+      'boosted_net = net_win * 1.25. Parlay of 2+ golfers to make the cut. Min overall odds +200. Not a two-way hedge — multi-outcome golf market. Value enhancement only. Best used on short-priced favorites where combined parlay still clears +200.',
+    notes:
+      'Expires at start of US Open 2026. 2+ legs required. Minimum odds +200 or greater. Excludes SGPx, progressive parlays, odds boosts, cash-outs, voided bets.',
+  },
+  {
+    template_id: 'fd-usopen-25pct-sgp-boost',
+    sportsbook: 'FanDuel',
+    promo_name: 'US Open 25% SGP Profit Boost',
+    promo_type: 'sgp_boost',
+    boost_percentage: 25,
+    boost_applies_to: 'net_winnings',
+    max_wager_amount: 10,
+    min_odds: '-200',
+    eligible_sports: ['Golf'],
+    eligible_leagues: ['US Open Championship'],
+    eligible_markets: ['SGP'],
+    eligible_bet_types: ['sgp'],
+    min_legs: 2,
+    excluded_bet_types: ['straight', 'odds_boosts', 'bonus_bets', 'cashed_out'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    ai_extraction_formula:
+      'boosted_net = net_win * 1.25. SGP 2+ legs, final odds -200 or longer. Golf SGPs are not directly hedgeable. Value play only.',
+    notes:
+      'Payout includes boosted winnings AND initial stake returned. Expires 12:00 AM ET Monday June 22, 2026. Ineligible: bonus funds, odds boosts, cashed out bets, straight bets.',
+  },
+  {
+    template_id: 'fd-mlb-early-win',
+    sportsbook: 'FanDuel',
+    promo_name: 'MLB Early Win Token',
+    promo_type: 'early_win',
+    max_wager_amount: 10,
+    eligible_sports: ['Baseball'],
+    eligible_leagues: ['MLB'],
+    eligible_markets: ['Moneyline (straight)'],
+    eligible_bet_types: ['straight'],
+    excluded_bet_types: ['bonus_bets', 'odds_boosts', 'cashed_out'],
+    requires_cash_funds: true,
+    one_time_use: true,
+    early_win_trigger:
+      'If your selected team leads by 2 or more runs at any point during the game, your bet immediately settles as a WIN regardless of the final result.',
+    ai_extraction_formula:
+      'Early settlement trigger creates a de facto hedge: place Early Win bet on Team A. If Team A goes up 2+ runs, bet settles as win early. To hedge: place a live bet on Team B moneyline once early settlement occurs (your Team A bet is already won, so Team B bet is a freeroll hedge). Pre-game hedge not possible — early win trigger makes the effective odds better than market odds. Standalone EV is positive vs standard moneyline due to early settlement edge.',
+    notes:
+      'Only valid for Pre-Live Straight Moneyline MLB bets. Cannot use bonus funds, site credit, or bonus bets. Expires 9:40 PM ET Wednesday June 17, 2026. Max $10 wager. Any wager other than an MLB Moneyline is ineligible.',
+  },
+  {
+    template_id: 'betmgm-wnba-15pct-odds-boost',
+    sportsbook: 'BetMGM',
+    promo_name: 'WNBA 15% Odds Boost Token',
+    promo_type: 'odds_boost',
+    boost_percentage: 15,
+    boost_applies_to: 'gross_payout',
+    max_wager_amount: 10,
+    min_odds: '-300',
+    eligible_sports: ['Basketball'],
+    eligible_leagues: ['WNBA'],
+    eligible_markets: [],
+    eligible_bet_types: ['straight', 'parlay', 'sgp'],
+    excluded_bet_types: [],
+    requires_cash_funds: false,
+    one_time_use: true,
+    ai_extraction_formula:
+      'BetMGM Odds Boost: boost applies to the enhanced odds (not net winnings — the odds themselves are increased by 15%). Effective payout = stake * ((original_american_to_decimal * 1.15) - 1) + stake approximately. Selection level min odds: -10000 (effectively any odds). Minimum overall odds: -300. Hedgeable in principle on any two-way market that clears -300 overall.',
+    notes:
+      'Expires 06/19/26 10:28 AM. Valid for Pre-Game and In-Play. Valid bets: SGP, Parlay, Straight. Selection level min odds: -10000. Minimum overall odds: -300. Boost paid in Cash.',
+  },
+  {
+    template_id: 'betmgm-mlb-15pct-parlay-boost',
+    sportsbook: 'BetMGM',
+    promo_name: 'MLB 15% Parlay Boost Token',
+    promo_type: 'parlay_boost',
+    boost_percentage: 15,
+    boost_applies_to: 'gross_payout',
+    max_wager_amount: 10,
+    min_odds: '+400',
+    eligible_sports: ['Baseball'],
+    eligible_leagues: ['MLB'],
+    eligible_markets: [],
+    eligible_bet_types: ['parlay', 'sgp'],
+    min_legs: 3,
+    excluded_bet_types: ['straight'],
+    requires_cash_funds: false,
+    one_time_use: true,
+    ai_extraction_formula:
+      'BetMGM parlay boost on MLB. Boost applies to gross odds. Min 3 picks, min overall odds +400. Not directly hedgeable — multi-leg parlay. Value enhancement play on a constructed parlay.',
+    notes:
+      'Expires 06/19/26 10:28 AM. Valid bets: Parlay, Same Game Parlay. Min Picks: 3. Selection level min odds: -10000. Minimum overall odds: +400. Pre-Game or In-Play.',
+  },
+  {
+    template_id: 'betmgm-worldcup-15pct-odds-boost',
+    sportsbook: 'BetMGM',
+    promo_name: "The World's Game 15% Odds Boost Token",
+    promo_type: 'odds_boost',
+    boost_percentage: 15,
+    boost_applies_to: 'gross_payout',
+    max_wager_amount: 10,
+    min_odds: '-300',
+    eligible_sports: ['Soccer'],
+    eligible_leagues: ['World Cup'],
+    eligible_markets: [],
+    eligible_bet_types: ['straight', 'parlay', 'sgp'],
+    excluded_bet_types: [],
+    requires_cash_funds: false,
+    one_time_use: true,
+    ai_extraction_formula:
+      'BetMGM World Cup odds boost. Selection min odds: -10000 (any). Overall min odds: -300. Boost is on the odds themselves, not net winnings. Hedgeable on any two-way World Cup market (O/U half-goal line preferred). Pair with FanDuel 50% profit boost for dual-token arbitrage.',
+    notes:
+      'Expires 06/19/26 10:28 AM. Pre-Game and In-Play eligible. Valid: SGP, Parlay, Straight. Min Overall Odds: -300. Boost paid in Cash.',
+  },
+  {
+    template_id: 'betmgm-usopen-15pct-odds-boost',
+    sportsbook: 'BetMGM',
+    promo_name: 'U.S. Open 15% Odds Boost Token',
+    promo_type: 'odds_boost',
+    boost_percentage: 15,
+    boost_applies_to: 'gross_payout',
+    max_wager_amount: 10,
+    min_odds: '-300',
+    eligible_sports: ['Golf'],
+    eligible_leagues: ['US Open Championship'],
+    eligible_markets: [],
+    eligible_bet_types: ['straight', 'parlay', 'sgp'],
+    excluded_bet_types: [],
+    requires_cash_funds: false,
+    one_time_use: true,
+    ai_extraction_formula:
+      'BetMGM odds boost on US Open golf. Boost applies to the odds. Selection min odds -10000, overall min odds -300. Golf markets are mostly non-hedgeable due to large field. Best used on head-to-head matchup markets (two-player) where a genuine opposing bet is possible.',
+    notes:
+      'Expires 06/18/26 12:00 AM. Pre-Game and In-Play. Valid: SGP, Parlay, Straight. Boost paid in Cash. Selection Level Min Odds: -10000. Minimum Overall Odds: -300.',
+  },
+  {
+    template_id: 'betmgm-mlb-20pct-sgp-boost',
+    sportsbook: 'BetMGM',
+    promo_name: 'Swing For The Fences 20% SGP Boost Token',
+    promo_type: 'sgp_boost',
+    boost_percentage: 20,
+    boost_applies_to: 'gross_payout',
+    max_wager_amount: 20,
+    min_odds: '+400',
+    eligible_sports: ['Baseball'],
+    eligible_leagues: ['MLB'],
+    eligible_markets: ['SGP'],
+    eligible_bet_types: ['sgp'],
+    excluded_bet_types: ['straight', 'parlay'],
+    requires_cash_funds: false,
+    one_time_use: true,
+    ai_extraction_formula:
+      'BetMGM SGP boost, 20%, applied to gross payout. Max stake $20 — double the usual cap. Valid only on Same Game Parlay. Min overall odds +400. Not directly hedgeable. Note: $20 max wager is higher than most tokens — captures more absolute value if a suitable SGP exists.',
+    notes:
+      'Expires 06/18/26 11:16 AM (Tomorrow). SGP only. Min overall odds +400. Boost paid in Cash. $20 max stake (higher than typical $10). Cash will be paid directly into account.',
+  },
+  {
+    template_id: 'dk-predictions-25-new-user',
+    sportsbook: 'DraftKings Predictions',
+    promo_name: 'Get $25 in Predictions Dollars Instantly',
+    promo_type: 'predictions_bonus',
+    free_bet_amount: 25,
+    stake_returned_on_free_bet: false,
+    eligible_sports: ['Predictions platform'],
+    eligible_leagues: [],
+    eligible_markets: ['DraftKings Predictions trades'],
+    eligible_bet_types: ['predictions_trade'],
+    excluded_bet_types: [],
+    requires_cash_funds: true,
+    one_time_use: true,
+    token_id_example: '92JOOR',
+    ai_extraction_formula:
+      'New user bonus — make a $5+ first trade on DraftKings Predictions to receive $25 Predictions Dollars. Predictions Dollars are platform-specific currency for the Predictions product (not sportsbook). Extraction via trading on high-probability outcomes or correlated positions within the platform.',
+    notes:
+      'Valid 6/1/26 – 6/28/26. New Predictions customers only. Must make a $5+ first trade. $25 issued instantly after qualifying trade. Void in NH and ME. DraftKings Predictions is a separate product from DK Sportsbook.',
+  },
+]
+
+// Build a fresh, fully-shaped token from a template. The token_id is left blank
+// (the user fills in their own); token_id_example is display-only and dropped.
+export function templateToToken(tpl) {
+  const base = emptyToken()
+  const { token_id_example, template_id, ...fields } = tpl // eslint-disable-line no-unused-vars
+  return normalizeToken({
+    ...base,
+    ...fields,
+    id: base.id,
+    template_id: tpl.template_id,
+    token_id: '',
+    status: 'available',
+    received_date: todayISODate(),
+  })
+}
