@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { usePersistentState, STORAGE_OK, clearAllData, migratePromotions, migrateTokens, loadLegacyPromoTokens } from './storage'
 import { Button, Modal } from './components.jsx'
 import Dashboard from './tabs/Dashboard.jsx'
@@ -10,6 +10,8 @@ import ArbFinder from './tabs/ArbFinder.jsx'
 import FreeBetCalculator from './tabs/FreeBetCalculator.jsx'
 import BankrollLedger from './tabs/BankrollLedger.jsx'
 import OpportunityLog from './tabs/OpportunityLog.jsx'
+import SheetSync from './tabs/SheetSync.jsx'
+import { pushBetsToSheet, pullBetsFromSheet } from './sheetsSync'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -21,6 +23,7 @@ const TABS = [
   { id: 'freebet', label: 'Free Bet Calculator' },
   { id: 'ledger', label: 'Bankroll Ledger' },
   { id: 'log', label: 'Opportunity Log' },
+  { id: 'sheets', label: 'Google Sheets Sync' },
 ]
 
 export default function App() {
@@ -33,6 +36,12 @@ export default function App() {
   const [sportsbooks, setSportsbooks] = usePersistentState('sportsbooks', [])
   const [log, setLog] = usePersistentState('opportunityLog', [])
   const [quotes, setQuotes] = usePersistentState('marketQuotes', [])
+  const [sheetSyncSettings, setSheetSyncSettings] = usePersistentState('sheetSyncSettings', {
+    scriptUrl: '',
+    autoSync: false,
+  })
+  const syncSkipFirst = useRef(true)
+  const lastPushedLog = useRef('')
 
   const promotions = useMemo(() => migratePromotions(promos), [promos])
   const promoTokens = useMemo(() => migrateTokens(tokens, promotions), [tokens, promotions])
@@ -84,6 +93,45 @@ export default function App() {
     setTab('log')
   }
 
+  useEffect(() => {
+    if (!sheetSyncSettings.autoSync || !sheetSyncSettings.scriptUrl) return undefined
+    let cancelled = false
+    async function pull() {
+      try {
+        const next = await pullBetsFromSheet(sheetSyncSettings.scriptUrl, log)
+        if (!cancelled) {
+          const nextJson = JSON.stringify(next)
+          lastPushedLog.current = nextJson
+          setLog(next)
+        }
+      } catch {
+        /* keep the dashboard usable if the sheet endpoint is temporarily unavailable */
+      }
+    }
+    pull()
+    const id = window.setInterval(pull, 60000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [sheetSyncSettings.autoSync, sheetSyncSettings.scriptUrl])
+
+  useEffect(() => {
+    if (!sheetSyncSettings.autoSync || !sheetSyncSettings.scriptUrl) return undefined
+    if (syncSkipFirst.current) {
+      syncSkipFirst.current = false
+      return undefined
+    }
+    const logJson = JSON.stringify(log)
+    if (logJson === lastPushedLog.current) return undefined
+    const id = window.setTimeout(() => {
+      pushBetsToSheet(sheetSyncSettings.scriptUrl, log)
+        .then(() => { lastPushedLog.current = logJson })
+        .catch(() => {})
+    }, 1500)
+    return () => window.clearTimeout(id)
+  }, [log, sheetSyncSettings.autoSync, sheetSyncSettings.scriptUrl])
+
   function handleReset() {
     clearAllData()
     setPromos([])
@@ -92,6 +140,7 @@ export default function App() {
     setTokens([])
     setTemplateLibrary([])
     setQuotes([])
+    setSheetSyncSettings({ scriptUrl: '', autoSync: false })
     setResetOpen(false)
   }
 
@@ -186,6 +235,14 @@ export default function App() {
         )}
         {tab === 'ledger' && (
           <BankrollLedger sportsbooks={sportsbooks} setSportsbooks={setSportsbooks} />
+        )}
+        {tab === 'sheets' && (
+          <SheetSync
+            log={log}
+            setLog={setLog}
+            settings={sheetSyncSettings}
+            setSettings={setSheetSyncSettings}
+          />
         )}
         {tab === 'log' && (
           <OpportunityLog
