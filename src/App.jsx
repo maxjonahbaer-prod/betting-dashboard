@@ -29,6 +29,7 @@ export default function App() {
   // Shared persisted data
   const [promos, setPromos] = usePersistentState('promoInventory', [])
   const [tokens, setTokens] = usePersistentState('promoTokens', loadLegacyPromoTokens())
+  const [templateLibrary, setTemplateLibrary] = usePersistentState('promoTemplateLibrary', [])
   const [sportsbooks, setSportsbooks] = usePersistentState('sportsbooks', [])
   const [log, setLog] = usePersistentState('opportunityLog', [])
   const [quotes, setQuotes] = usePersistentState('marketQuotes', [])
@@ -89,6 +90,7 @@ export default function App() {
     setSportsbooks([])
     setLog([])
     setTokens([])
+    setTemplateLibrary([])
     setQuotes([])
     setResetOpen(false)
   }
@@ -153,6 +155,8 @@ export default function App() {
             sportsbookNames={sportsbookNames}
             setSportsbooks={setSportsbooks}
             log={log}
+            templateLibrary={templateLibrary}
+            setTemplateLibrary={setTemplateLibrary}
           />
         )}
         {tab === 'arb' && (

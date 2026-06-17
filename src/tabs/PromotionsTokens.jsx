@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import {
   Card,
   Button,
@@ -12,6 +12,7 @@ import {
   sortRows,
 } from '../components.jsx'
 import { uid, formatUSD, countdownString, hoursUntil } from '../utils'
+import { PROMO_TEMPLATES } from '../lib/templates'
 
 const PROMOTION_TYPES = [
   'profit_boost',
@@ -21,10 +22,17 @@ const PROMOTION_TYPES = [
   'deposit_match',
   'odds_boost',
   'parlay_boost',
+  'sgp_boost',
+  'bet_protection',
+  'risk_free_bet',
+  'early_win',
+  'draw_refund',
+  'reload_bonus',
+  'predictions_bonus',
   'other',
 ]
 const PROMOTION_STATUSES = ['active', 'expired', 'completed', 'cancelled']
-const TOKEN_TYPES = ['profit_boost', 'free_bet', 'bonus_bet', 'sweat_free', 'deposit_match', 'odds_boost', 'parlay_boost', 'other']
+const TOKEN_TYPES = ['profit_boost', 'free_bet', 'bonus_bet', 'sweat_free', 'deposit_match', 'odds_boost', 'parlay_boost', 'sgp_boost', 'bet_protection', 'risk_free_bet', 'early_win', 'draw_refund', 'reload_bonus', 'predictions_bonus', 'other']
 const TOKEN_STATUSES = ['available', 'partially_used', 'used', 'expired']
 
 const label = (v) => String(v || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
@@ -50,6 +58,71 @@ export function tokenDisplayName(token) {
 
 export function tokenEstimatedValue(token) {
   return Number(token.value || token.bonusAmount || token.maxStake || 0)
+}
+
+
+function templateToPromotion(template) {
+  return {
+    id: uid(),
+    templateId: template.template_id || template.id || '',
+    sportsbook: template.sportsbook || '',
+    promotionName: template.promo_name || template.promotionName || template.tokenName || '',
+    promotionType: template.promo_type || template.promotionType || template.tokenType || 'other',
+    description: template.description || template.promo_name || template.notes || '',
+    startDate: today(),
+    expirationDate: template.expiry_date || template.expirationDate || '',
+    terms: template.terms || template.notes || '',
+    status: 'active',
+    estimatedValue: template.free_bet_amount ?? template.bonusAmount ?? template.deposit_match_max ?? template.value ?? '',
+    boostPct: template.boost_percentage ?? template.boostPercent ?? '',
+    bonusAmount: template.free_bet_amount ?? template.bonusAmount ?? '',
+    maxStake: template.max_wager_amount ?? template.maxStake ?? '',
+    notes: template.notes || '',
+  }
+}
+
+function templateToManagedToken(template, promotion) {
+  const quantity = Number(template.quantity || template.max_uses_per_account || 1) || 1
+  return {
+    id: uid(),
+    templateId: template.template_id || template.id || '',
+    promotionId: promotion?.id || template.promotionId || '',
+    sportsbook: template.sportsbook || promotion?.sportsbook || '',
+    tokenName: template.promo_name || template.tokenName || promotion?.promotionName || '',
+    tokenType: template.promo_type || template.tokenType || promotion?.promotionType || 'other',
+    quantity,
+    remainingQuantity: quantity,
+    value: template.value ?? template.free_bet_amount ?? template.protection_amount ?? template.deposit_match_max ?? '',
+    maxStake: template.max_wager_amount ?? template.maxStake ?? '',
+    boostPercent: template.boost_percentage ?? template.boostPercent ?? '',
+    bonusAmount: template.free_bet_amount ?? template.bonusAmount ?? '',
+    expirationDate: template.expiry_date || template.expirationDate || promotion?.expirationDate || '',
+    status: 'available',
+    usedOnBetIds: [],
+    minOdds: template.min_odds || '',
+    eligibleSports: template.eligible_sports || [],
+    eligibleLeagues: template.eligible_leagues || [],
+    eligibleMarkets: template.eligible_markets || [],
+    eligibleBetTypes: template.eligible_bet_types || [],
+    minLegs: template.min_legs ?? '',
+    excludedBetTypes: template.excluded_bet_types || [],
+    excludedMarkets: template.excluded_markets || [],
+    aiExtractionFormula: template.ai_extraction_formula || '',
+    notes: template.notes || '',
+  }
+}
+
+function recordsFromUpload(parsed) {
+  if (Array.isArray(parsed)) return { templates: parsed }
+  return {
+    promotions: Array.isArray(parsed?.promotions) ? parsed.promotions : [],
+    tokens: Array.isArray(parsed?.tokens) ? parsed.tokens : [],
+    templates: Array.isArray(parsed?.templates) ? parsed.templates : Array.isArray(parsed?.promoTemplates) ? parsed.promoTemplates : [],
+  }
+}
+
+function templateKey(template) {
+  return String(template.template_id || template.id || `${template.sportsbook || ''}:${template.promo_name || template.promotionName || template.tokenName || ''}`).toLowerCase()
 }
 
 function emptyPromotion() {
@@ -218,7 +291,7 @@ function TokenForm({ initial, promotions, onSave }) {
   )
 }
 
-export default function PromotionsTokens({ promotions, setPromotions, tokens, setTokens, sportsbookNames, setSportsbooks, log }) {
+export default function PromotionsTokens({ promotions, setPromotions, tokens, setTokens, sportsbookNames, setSportsbooks, log, templateLibrary = [], setTemplateLibrary }) {
   const [promoDraft, setPromoDraft] = useState(emptyPromotion())
   const [tokenDraft, setTokenDraft] = useState(emptyToken())
   const [sort, setSort] = useState({ key: 'expirationDate', dir: 'asc' })
@@ -227,6 +300,10 @@ export default function PromotionsTokens({ promotions, setPromotions, tokens, se
   const [fExpiry, setFExpiry] = useState('')
   const [editingPromoId, setEditingPromoId] = useState('')
   const [editingTokenId, setEditingTokenId] = useState('')
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [libraryBook, setLibraryBook] = useState('')
+  const [importMessage, setImportMessage] = useState('')
+  const uploadRef = useRef(null)
 
   function addSportsbookIfMissing(name) {
     if (!name) return
@@ -259,10 +336,113 @@ export default function PromotionsTokens({ promotions, setPromotions, tokens, se
     } : token))
   }
 
+  function addTemplateToLibrary(template) {
+    if (!setTemplateLibrary) return
+    const saved = { ...template, template_id: template.template_id || `custom-${uid()}`, saved_at: new Date().toISOString() }
+    setTemplateLibrary((prev) => {
+      const key = templateKey(saved)
+      return prev.some((item) => templateKey(item) === key) ? prev.map((item) => templateKey(item) === key ? saved : item) : [saved, ...prev]
+    })
+    setImportMessage(`Saved ${saved.promo_name || saved.promotionName || saved.tokenName || 'template'} to your library.`)
+  }
+
+  function createFromTemplate(template) {
+    const promotion = templateToPromotion(template)
+    const token = templateToManagedToken(template, promotion)
+    savePromotion(promotion)
+    saveToken(token)
+    setImportMessage(`Created ${token.tokenName} from the library.`)
+  }
+
+  function saveTokenAsTemplate(token) {
+    addTemplateToLibrary({
+      template_id: token.templateId || `custom-${token.sportsbook}-${token.tokenName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      sportsbook: token.sportsbook,
+      promo_name: token.tokenName,
+      promo_type: token.tokenType,
+      boost_percentage: token.boostPercent || null,
+      max_wager_amount: token.maxStake || null,
+      free_bet_amount: token.bonusAmount || token.value || null,
+      eligible_sports: token.eligibleSports || [],
+      eligible_leagues: token.eligibleLeagues || [],
+      eligible_markets: token.eligibleMarkets || [],
+      eligible_bet_types: token.eligibleBetTypes || [],
+      min_legs: token.minLegs || null,
+      excluded_bet_types: token.excludedBetTypes || [],
+      excluded_markets: token.excludedMarkets || [],
+      ai_extraction_formula: token.aiExtractionFormula || '',
+      notes: token.notes || '',
+    })
+  }
+
+  function exportTemplateLibrary() {
+    const payload = {
+      library: 'promo_template_library',
+      exported_at: new Date().toISOString(),
+      templates: [...templateLibrary],
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `promo-token-library-${today()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function importFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text())
+      const incoming = recordsFromUpload(parsed)
+      let addedPromos = 0
+      let addedTokens = 0
+      let addedTemplates = 0
+
+      if (incoming.promotions.length) {
+        const nextPromos = incoming.promotions.map((p) => ({ ...emptyPromotion(), ...p, id: p.id || uid() }))
+        setPromotions((prev) => [...nextPromos, ...prev])
+        addedPromos = nextPromos.length
+      }
+      if (incoming.tokens.length) {
+        const nextTokens = incoming.tokens.map((t) => ({ ...emptyToken(), ...t, id: t.id || uid(), usedOnBetIds: t.usedOnBetIds || [] }))
+        setTokens((prev) => [...nextTokens, ...prev])
+        addedTokens = nextTokens.length
+      }
+      if (incoming.templates.length && setTemplateLibrary) {
+        setTemplateLibrary((prev) => {
+          const byKey = new Map(prev.map((template) => [templateKey(template), template]))
+          incoming.templates.forEach((template) => byKey.set(templateKey(template), template))
+          addedTemplates = incoming.templates.length
+          return Array.from(byKey.values())
+        })
+      }
+      setImportMessage(`Imported ${addedPromos} promotions, ${addedTokens} tokens, and ${addedTemplates} reusable templates.`)
+    } catch (err) {
+      setImportMessage(`Import failed: ${err.message}`)
+    }
+  }
+
+
+  const builtInTemplates = PROMO_TEMPLATES
+  const reusableTemplates = useMemo(() => [...templateLibrary, ...builtInTemplates], [templateLibrary, builtInTemplates])
+
   const allSportsbooks = useMemo(
-    () => [...new Set([...sportsbookNames, ...promotions.map((p) => p.sportsbook), ...tokens.map((t) => t.sportsbook)])].filter(Boolean).sort(),
-    [sportsbookNames, promotions, tokens],
+    () => [...new Set([...sportsbookNames, ...promotions.map((p) => p.sportsbook), ...tokens.map((t) => t.sportsbook), ...reusableTemplates.map((t) => t.sportsbook)])].filter(Boolean).sort(),
+    [sportsbookNames, promotions, tokens, reusableTemplates],
   )
+
+  const shownTemplates = useMemo(() => reusableTemplates.filter((template) => {
+    if (libraryBook && template.sportsbook !== libraryBook) return false
+    if (librarySearch) {
+      const q = librarySearch.toLowerCase()
+      const hay = `${template.sportsbook || ''} ${template.promo_name || ''} ${template.promotionName || ''} ${template.notes || ''}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  }), [reusableTemplates, libraryBook, librarySearch])
 
   const tokenRows = useMemo(() => tokens.map((token) => ({ ...token, effectiveStatus: effectiveTokenStatus(token) })), [tokens])
   const filteredTokens = useMemo(() => tokenRows.filter((token) => {
@@ -310,6 +490,55 @@ export default function PromotionsTokens({ promotions, setPromotions, tokens, se
           <p className="text-sm text-slate-400">Promotions are sportsbook offers. Tokens are the usable items those offers grant.</p>
         </div>
       </div>
+
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-200">Reusable Promo/Token Library</h3>
+            <p className="text-xs text-slate-500">Use recurring sportsbook templates, save your own versions, or upload a JSON library.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input ref={uploadRef} type="file" accept="application/json,.json" className="hidden" onChange={importFile} />
+            <Button variant="secondary" onClick={() => uploadRef.current?.click()}>Upload Library</Button>
+            <Button variant="secondary" onClick={exportTemplateLibrary} disabled={!templateLibrary.length}>Export My Library</Button>
+          </div>
+        </div>
+        {importMessage && <div className="mt-3 rounded bg-slate-900 px-3 py-2 text-xs text-slate-300">{importMessage}</div>}
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <TextInput placeholder="Search templates" value={librarySearch} onChange={(e) => setLibrarySearch(e.target.value)} />
+          <Select value={libraryBook} onChange={(e) => setLibraryBook(e.target.value)}>
+            <option value="">All template sportsbooks</option>
+            {allSportsbooks.map((book) => <option key={book} value={book}>{book}</option>)}
+          </Select>
+        </div>
+        <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto md:grid-cols-2 xl:grid-cols-3">
+          {shownTemplates.map((template) => {
+            const isCustom = templateLibrary.some((item) => templateKey(item) === templateKey(template))
+            return (
+              <div key={`${isCustom ? 'custom' : 'built'}-${templateKey(template)}`} className="rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-emerald-400">{template.sportsbook || 'Sportsbook'}</div>
+                    <div className="mt-1 text-sm font-medium text-slate-100">{template.promo_name || template.promotionName || template.tokenName}</div>
+                  </div>
+                  <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{isCustom ? 'Saved' : 'Built-in'}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                  <span>{label(template.promo_type || template.promotionType || template.tokenType)}</span>
+                  {template.boost_percentage != null && <span>{template.boost_percentage}% boost</span>}
+                  {template.max_wager_amount != null && <span>Max {formatUSD(template.max_wager_amount)}</span>}
+                  {template.min_odds && <span>Min {template.min_odds}</span>}
+                </div>
+                {template.notes && <p className="mt-2 line-clamp-2 text-[11px] text-slate-500">{template.notes}</p>}
+                <div className="mt-3 flex justify-end gap-1">
+                  <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => createFromTemplate(template)}>Create</Button>
+                  {!isCustom && <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => addTemplateToLibrary(template)}>Save</Button>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Card className="p-3"><div className="text-xs uppercase text-slate-400">Active Promos</div><div className="mt-1 text-2xl font-bold text-slate-100">{summary.activePromos}</div></Card>
@@ -374,6 +603,7 @@ export default function PromotionsTokens({ promotions, setPromotions, tokens, se
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => editToken(token)}>Edit</Button>
+                        <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => saveTokenAsTemplate(token)}>Save Template</Button>
                         <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => setTokenStatus(token.id, 'used')}>Used</Button>
                         <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => setTokenStatus(token.id, 'expired')}>Expired</Button>
                       </div>

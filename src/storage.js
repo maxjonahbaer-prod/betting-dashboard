@@ -47,7 +47,7 @@ export function usePersistentState(key, initialValue) {
 
 export function clearAllData() {
   if (!STORAGE_OK) return
-  ;['promoInventory', 'promoTokens', 'sportsbooks', 'opportunityLog', 'marketQuotes', 'promo_token_library_v1'].forEach((k) => {
+  ;['promoInventory', 'promoTokens', 'promoTemplateLibrary', 'sportsbooks', 'opportunityLog', 'marketQuotes', 'promo_token_library_v1'].forEach((k) => {
     try {
       window.localStorage.removeItem(k)
     } catch {
@@ -146,7 +146,7 @@ export function normalizeTokenStatus(status, remainingQuantity = 1, quantity = 1
 
 export function normalizeTokenType(type) {
   const s = String(type || '').toLowerCase().replace(/[\s-]+/g, '_')
-  if (['profit_boost', 'free_bet', 'bonus_bet', 'sweat_free', 'deposit_match', 'odds_boost', 'parlay_boost'].includes(s)) return s
+  if (['profit_boost', 'free_bet', 'bonus_bet', 'sweat_free', 'deposit_match', 'odds_boost', 'parlay_boost', 'sgp_boost', 'bet_protection', 'risk_free_bet', 'early_win', 'draw_refund', 'reload_bonus', 'predictions_bonus'].includes(s)) return s
   if (s === 'risk_free_bet' || s === 'bet_protection') return 'sweat_free'
   return 'other'
 }
