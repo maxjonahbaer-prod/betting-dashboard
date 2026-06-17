@@ -95,10 +95,10 @@ function mergeByUpdatedAt(localRows, remoteRows) {
 
 async function syncRequest(scriptUrl, payload) {
   if (!scriptUrl) throw new Error('Add your Google Apps Script Web App URL first.')
-  const res = await fetch(scriptUrl, {
+  const res = await fetch('/api/sheets-sync', {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scriptUrl, payload }),
   })
   const text = await res.text()
   let data
