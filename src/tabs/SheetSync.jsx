@@ -7,7 +7,23 @@ export default function SheetSync({ log, setLog, settings, setSettings }) {
   const [busy, setBusy] = useState(false)
   const set = (k, v) => setSettings((prev) => ({ ...prev, [k]: v }))
 
+  function validateScriptUrl() {
+    if (!settings.scriptUrl) return 'Paste your deployed Apps Script Web App URL first.'
+    if (settings.scriptUrl.includes('docs.google.com/spreadsheets')) {
+      return 'That is the Google Sheet URL. Deploy the Apps Script as a Web App, then paste the script.google.com/macros/.../exec URL here.'
+    }
+    if (!settings.scriptUrl.includes('script.google.com/macros/')) {
+      return 'This should be a Google Apps Script Web App URL that starts with https://script.google.com/macros/.'
+    }
+    return ''
+  }
+
   async function run(label, fn) {
+    const validation = validateScriptUrl()
+    if (validation) {
+      setStatus(validation)
+      return
+    }
     setBusy(true)
     setStatus(`${label}...`)
     try {
@@ -33,7 +49,7 @@ export default function SheetSync({ log, setLog, settings, setSettings }) {
             <TextInput
               value={settings.scriptUrl || ''}
               onChange={(e) => set('scriptUrl', e.target.value)}
-              placeholder="https://script.google.com/macros/s/.../exec"
+              placeholder="https://script.google.com/macros/s/.../exec (not the spreadsheet URL)"
             />
           </Field>
           <div className="flex items-end">
@@ -82,7 +98,7 @@ export default function SheetSync({ log, setLog, settings, setSettings }) {
       <Card className="p-4">
         <h3 className="text-sm font-semibold text-slate-200">Sheet Setup</h3>
         <p className="mt-2 text-sm text-slate-400">
-          Add the included Google Apps Script to your bet-tracking spreadsheet, deploy it as a Web App, then paste the Web App URL above.
+          Open Extensions, then Apps Script in this spreadsheet, paste the included script, deploy it as a Web App, then paste the script.google.com Web App URL above. Do not paste the normal docs.google.com spreadsheet URL.
         </p>
         <div className="mt-3 rounded bg-slate-950/70 p-3 font-mono text-[11px] text-slate-300">
           {BET_SHEET_HEADERS.join(' | ')}
